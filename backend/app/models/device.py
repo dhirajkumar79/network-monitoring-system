@@ -15,6 +15,10 @@ class Device(db.Model):
     status = db.Column(db.String(20), nullable=False, default="UNKNOWN", index=True)
     location = db.Column(db.String(120), nullable=True)
     last_active_time = db.Column(db.DateTime, nullable=True, index=True)
+
+    # Hashed device token — never store the raw token in the DB
+    device_token_hash = db.Column(db.String(64), unique=True, nullable=True, index=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

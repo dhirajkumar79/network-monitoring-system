@@ -23,8 +23,10 @@ def create_app(config_class=Config):
     # --- Register blueprints ---
     from app.routes.health import health_bp
     from app.routes.auth import auth_bp
+    from app.routes.client import client_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(client_bp)
 
     return app
