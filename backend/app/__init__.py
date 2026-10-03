@@ -2,7 +2,7 @@
 from flask_cors import CORS
 
 from app.config import Config
-from app.extensions import db, migrate
+from app.extensions import db, migrate, jwt
 
 
 def create_app(config_class=Config):
@@ -12,8 +12,9 @@ def create_app(config_class=Config):
     # --- Init extensions ---
     db.init_app(app)
     migrate.init_app(app, db)
+    jwt.init_app(app)
 
-    # CORS: allow the React frontend (localhost:5173) to talk to us later
+    # --- CORS ---
     CORS(app, origins=app.config.get("CORS_ORIGINS", "*").split(","))
 
     # --- Import models so migrations can see them ---
@@ -21,7 +22,9 @@ def create_app(config_class=Config):
 
     # --- Register blueprints ---
     from app.routes.health import health_bp
+    from app.routes.auth import auth_bp
 
     app.register_blueprint(health_bp)
+    app.register_blueprint(auth_bp)
 
     return app

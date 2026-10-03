@@ -1,7 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_jwt_extended import JWTManager
 
-# Shared objects — created here so every module can import them
-# without circular-import headaches.
 db = SQLAlchemy()
 migrate = Migrate()
+jwt = JWTManager()
