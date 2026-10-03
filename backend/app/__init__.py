@@ -24,9 +24,17 @@ def create_app(config_class=Config):
     from app.routes.health import health_bp
     from app.routes.auth import auth_bp
     from app.routes.client import client_bp
+    from app.routes.devices import devices_bp
+    from app.routes.events import events_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(client_bp)
+    app.register_blueprint(devices_bp)
+    app.register_blueprint(events_bp)
+
+    # --- Start background tasks ---
+    from app.tasks.offline_checker import start_offline_checker
+    start_offline_checker(app)
 
     return app
