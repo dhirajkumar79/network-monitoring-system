@@ -1,33 +1,69 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import api from "../api/client";
 import Layout from "../components/Layout";
+import { useSocket } from "../context/SocketContext";
 export default function Dashboard() {
   const [devices, setDevices] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [devicesRes, eventsRes] = await Promise.all([
-          api.get("/api/devices"),
-          api.get("/api/events?limit=5"),
-        ]);
-        setDevices(devicesRes.data.data);
-        setEvents(eventsRes.data.data);
-      } catch (err) {
-        console.error("Fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const { socket, connected } = useSocket();
+  const fetchData = useCallback(async () => {
+    try {
+      const [devicesRes, eventsRes] = await Promise.all([
+        api.get("/api/devices"),
+        api.get("/api/events?limit=5"),
+      ]);
+      setDevices(devicesRes.data.data);
+      setEvents(eventsRes.data.data);
+      setLastUpdate(new Date());
+    } catch (err) {
+      console.error("Fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+  useEffect(() => {
+    if (!socket) return;
+    const handleUpdate = () => {
+      console.log("[dashboard] live update received");
+      fetchData();
+    };
+    socket.on("device_heartbeat", handleUpdate);
+    socket.on("device_status_change", handleUpdate);
+    socket.on("device_registered", handleUpdate);
+    socket.on("new_alert", handleUpdate);
+    return () => {
+      socket.off("device_heartbeat", handleUpdate);
+      socket.off("device_status_change", handleUpdate);
+      socket.off("device_registered", handleUpdate);
+      socket.off("new_alert", handleUpdate);
+    };
+  }, [socket, fetchData]);
   const total = devices.length;
   const online = devices.filter((d) => d.status === "ONLINE").length;
   const offline = devices.filter((d) => d.status === "OFFLINE").length;
   const unknown = devices.filter((d) => d.status === "UNKNOWN").length;
   return (
     <Layout>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              connected ? "bg-green-500 animate-pulse" : "bg-red-500"
+            }`}
+          />
+          <span className="text-xs text-gray-500">
+            {connected ? "Live updates active" : "Disconnected"}
+          </span>
+        </div>
+        <span className="text-xs text-gray-500">
+          Last update: {lastUpdate.toLocaleTimeString()}
+        </span>
+      </div>
       {loading ? (
         <div className="text-center text-gray-500">Loading...</div>
       ) : (

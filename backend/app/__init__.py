@@ -2,7 +2,7 @@
 from flask_cors import CORS
 
 from app.config import Config
-from app.extensions import db, migrate, jwt
+from app.extensions import db, migrate, jwt, socketio
 
 
 def create_app(config_class=Config):
@@ -13,6 +13,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    socketio.init_app(app)
 
     # --- CORS ---
     CORS(app, origins=app.config.get("CORS_ORIGINS", "*").split(","))
@@ -32,6 +33,10 @@ def create_app(config_class=Config):
     app.register_blueprint(client_bp)
     app.register_blueprint(devices_bp)
     app.register_blueprint(events_bp)
+
+    # --- Register Socket.IO handlers ---
+    from app.websocket.events import register_socketio_handlers
+    register_socketio_handlers()
 
     # --- Start background tasks ---
     from app.tasks.offline_checker import start_offline_checker
