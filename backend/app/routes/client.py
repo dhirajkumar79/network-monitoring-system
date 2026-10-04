@@ -129,7 +129,7 @@ def heartbeat():
             description=f"Device '{device.device_name}' is back online",
         ))
 
-    # Store metrics if provided
+       # Store metrics if provided
     data = request.get_json(silent=True) or {}
     metric = NetworkMetric(
         device_id=device.device_id,
@@ -143,6 +143,14 @@ def heartbeat():
         packet_loss=data.get("packet_loss"),
     )
     db.session.add(metric)
+    db.session.flush()  # flush so alerts can be added in the same commit
+
+    # --- Threshold alerting ---
+    from app.services.alert_service import evaluate_alerts
+    alert_count = evaluate_alerts(device.device_id, data)
+    if alert_count:
+        print(f"[alert] {alert_count} alert(s) for device {device.device_id}")
+
     db.session.commit()
 
     return jsonify({
