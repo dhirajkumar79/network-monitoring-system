@@ -8,6 +8,7 @@ export default function Layout({ children }) {
     { path: "/dashboard", label: "Dashboard" },
     { path: "/devices", label: "Devices" },
     { path: "/alerts", label: "Alerts" },
+    { path: "/sessions", label: "Sessions" },
     { path: "/reports", label: "Reports" },
   ];
   const handleLogout = async () => {

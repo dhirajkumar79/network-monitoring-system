@@ -36,11 +36,13 @@ export default function Dashboard() {
     socket.on("device_status_change", handleUpdate);
     socket.on("device_registered", handleUpdate);
     socket.on("new_alert", handleUpdate);
+    socket.on("session_update", handleUpdate);
     return () => {
       socket.off("device_heartbeat", handleUpdate);
       socket.off("device_status_change", handleUpdate);
       socket.off("device_registered", handleUpdate);
       socket.off("new_alert", handleUpdate);
+      socket.off("session_update", handleUpdate);
     };
   }, [socket, fetchData]);
   const total = devices.length;

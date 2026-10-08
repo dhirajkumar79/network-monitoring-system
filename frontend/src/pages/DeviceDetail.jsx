@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   LineChart,
@@ -11,33 +11,64 @@ import {
 } from "recharts";
 import api from "../api/client";
 import Layout from "../components/Layout";
+import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 export default function DeviceDetail() {
   const { id } = useParams();
+  const { isAdmin } = useAuth();
+  const { socket } = useSocket();
   const [device, setDevice] = useState(null);
   const [metrics, setMetrics] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [devRes, metRes, evtRes] = await Promise.all([
-          api.get(`/api/devices/${id}`),
-          api.get(`/api/devices/${id}/metrics?limit=100`),
-          api.get(`/api/devices/${id}/events?limit=20`),
-        ]);
-        setDevice(devRes.data.data);
-        // metrics come newest-first from server; reverse for chart
-        setMetrics([...metRes.data.data].reverse());
-        setEvents(evtRes.data.data);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load device");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
+  const [startingSession, setStartingSession] = useState(false);
+  const fetchAll = useCallback(async () => {
+    try {
+      const [devRes, metRes, evtRes] = await Promise.all([
+        api.get(`/api/devices/${id}`),
+        api.get(`/api/devices/${id}/metrics?limit=100`),
+        api.get(`/api/devices/${id}/events?limit=20`),
+      ]);
+      setDevice(devRes.data.data);
+      setMetrics([...metRes.data.data].reverse());
+      setEvents(evtRes.data.data);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load device");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => fetchAll();
+    socket.on("device_heartbeat", handler);
+    socket.on("device_status_change", handler);
+    socket.on("session_update", handler);
+    return () => {
+      socket.off("device_heartbeat", handler);
+      socket.off("device_status_change", handler);
+      socket.off("session_update", handler);
+    };
+  }, [socket, fetchAll]);
+  const startRemoteSession = async () => {
+    if (!window.confirm(`Start a remote desktop session for ${device.device_name}?`)) return;
+    setStartingSession(true);
+    try {
+      const res = await api.post("/api/sessions", {
+        device_id: device.device_id,
+        session_type: "REMOTE_DESKTOP",
+      });
+      alert(`Session ${res.data.data.session_id} created (CONNECTING). Check the Sessions page.`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to start session");
+    } finally {
+      setStartingSession(false);
+    }
+  };
   if (loading) {
     return (
       <Layout>
@@ -63,6 +94,7 @@ export default function DeviceDetail() {
     mem: m.memory_usage,
     latency: m.latency_ms,
   }));
+  const canStartSession = isAdmin && device.status === "ONLINE";
   return (
     <Layout>
       <Link to="/devices" className="text-sm text-blue-600 hover:underline">
@@ -73,16 +105,30 @@ export default function DeviceDetail() {
           <h2 className="text-2xl font-bold text-gray-800">{device.device_name}</h2>
           <p className="text-sm text-gray-500">{device.hostname}</p>
         </div>
-        <StatusBadge status={device.status} />
+        <div className="flex items-center gap-3">
+          <StatusBadge status={device.status} />
+          {isAdmin && (
+            <button
+              onClick={startRemoteSession}
+              disabled={!canStartSession || startingSession}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                device.status !== "ONLINE"
+                  ? "Device must be ONLINE to start a session"
+                  : "Start remote desktop session"
+              }
+            >
+              {startingSession ? "Starting..." : "Start Remote Session"}
+            </button>
+          )}
+        </div>
       </div>
-      {/* Info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <InfoCard label="IP Address" value={device.ip_address || "-"} />
         <InfoCard label="MAC Address" value={device.mac_address || "-"} />
         <InfoCard label="Operating System" value={device.operating_system || "-"} />
         <InfoCard label="Location" value={device.location || "-"} />
       </div>
-      {/* Charts */}
       {chartData.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500 mb-8">
           No metrics yet for this device.
@@ -114,7 +160,6 @@ export default function DeviceDetail() {
           </ChartCard>
         </div>
       )}
-      {/* Events */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b">
           <h3 className="font-semibold text-gray-800">Recent Events</h3>

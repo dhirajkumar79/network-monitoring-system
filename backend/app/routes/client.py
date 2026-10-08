@@ -131,3 +131,60 @@ def heartbeat():
             "server_time": datetime.utcnow().isoformat(),
         },
     }), 200
+
+
+    # ---------- Session polling (agent side) ----------
+
+@client_bp.route("/api/client/pending-session", methods=["GET"])
+def pending_session():
+    """Agent polls this to see if an admin requested a remote session."""
+    device = _device_from_request()
+    if device is None:
+        return jsonify({"success": False, "message": "Invalid or missing device token"}), 401
+
+    from app.services.session_service import list_pending_for_device
+    sess = list_pending_for_device(device.device_id)
+    if sess is None:
+        return jsonify({"success": True, "data": None}), 200
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "session_id": sess.session_id,
+            "session_type": sess.session_type,
+            "connection_status": sess.connection_status,
+            "start_time": sess.start_time.isoformat() if sess.start_time else None,
+        },
+    }), 200
+
+
+@client_bp.route("/api/client/session-status", methods=["POST"])
+def session_status():
+    """Agent reports a session status change."""
+    device = _device_from_request()
+    if device is None:
+        return jsonify({"success": False, "message": "Invalid or missing device token"}), 401
+
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id")
+    status = (data.get("status") or "").upper()
+
+    if not session_id or status not in ("CONNECTED", "DISCONNECTED", "FAILED"):
+        return jsonify({"success": False, "message": "session_id and valid status required"}), 400
+
+    from app.services.session_service import get_session, update_session_status
+    sess = get_session(session_id)
+    if sess is None or sess.device_id != device.device_id:
+        return jsonify({"success": False, "message": "Session not found for this device"}), 404
+
+    update_session_status(session_id, status)
+
+    from app.websocket.events import broadcast_event
+    broadcast_event("session_update", {
+        "session_id": session_id,
+        "device_id": device.device_id,
+        "connection_status": status,
+        "session_type": sess.session_type,
+    })
+
+    return jsonify({"success": True, "data": {"session_id": session_id, "status": status}}), 200
