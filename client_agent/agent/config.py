@@ -27,3 +27,6 @@ class Config:
 
     # User-facing device name (defaults to hostname if blank)
     DEVICE_NAME = os.getenv("DEVICE_NAME", "")
+
+    # Target for Remote Desktop demo (blank = just open mstsc)
+    REMOTE_DESKTOP_TARGET = os.getenv("REMOTE_DESKTOP_TARGET", "")
