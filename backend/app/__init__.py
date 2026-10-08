@@ -28,6 +28,7 @@ def create_app(config_class=Config):
     from app.routes.devices import devices_bp
     from app.routes.events import events_bp
     from app.routes.sessions import sessions_bp
+    from app.routes.reports import reports_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
@@ -35,6 +36,7 @@ def create_app(config_class=Config):
     app.register_blueprint(devices_bp)
     app.register_blueprint(events_bp)
     app.register_blueprint(sessions_bp)
+    app.register_blueprint(reports_bp)
 
     # --- Register Socket.IO handlers ---
     from app.websocket.events import register_socketio_handlers
