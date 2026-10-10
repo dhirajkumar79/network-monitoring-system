@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
-
+from app.utils.decorators import role_required
 from app.services import device_service
 
 devices_bp = Blueprint("devices_bp", __name__)
@@ -61,3 +61,17 @@ def get_device_events(device_id):
         "success": True,
         "data": [e.to_dict() for e in events],
     }), 200
+
+@devices_bp.route("/api/devices/<int:device_id>", methods=["DELETE"])
+@role_required("ADMIN")
+def delete_device(device_id):
+    """Delete a device and all its data. ADMIN only."""
+    ok = device_service.delete_device(device_id)
+    if not ok:
+        return jsonify({"success": False, "message": "Device not found"}), 404
+
+    # Broadcast to dashboard so it refreshes live
+    from app.websocket.events import broadcast_event
+    broadcast_event("device_deleted", {"device_id": device_id})
+
+    return jsonify({"success": True, "data": {"device_id": device_id}}), 200

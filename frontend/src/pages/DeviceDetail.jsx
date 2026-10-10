@@ -54,6 +54,22 @@ export default function DeviceDetail() {
       socket.off("session_update", handler);
     };
   }, [socket, fetchAll]);
+
+  const deleteThisDevice = async () => {
+    const confirmMsg =
+      `Delete device "${device.device_name}" (ID ${device.device_id})?\n\n` +
+      `This removes ALL its metrics, events, and sessions. Cannot be undone.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await api.delete(`/api/devices/${device.device_id}`);
+      window.location.href = "/devices";
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete device");
+    }
+  };
+
   const startRemoteSession = async () => {
     if (!window.confirm(`Start a remote desktop session for ${device.device_name}?`)) return;
     setStartingSession(true);

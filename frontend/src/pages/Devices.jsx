@@ -1,26 +1,63 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/client";
 import Layout from "../components/Layout";
+import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
+
 export default function Devices() {
+  const { isAdmin } = useAuth();
+  const { socket } = useSocket();
   const [devices, setDevices] = useState([]);
   const [filter, setFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const res = await api.get("/api/devices");
-        setDevices(res.data.data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDevices();
+
+  const fetchDevices = useCallback(async () => {
+    try {
+      const res = await api.get("/api/devices");
+      setDevices(res.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDevices();
+  }, [fetchDevices]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => fetchDevices();
+    socket.on("device_deleted", handler);
+    socket.on("device_status_change", handler);
+    socket.on("device_heartbeat", handler);
+    return () => {
+      socket.off("device_deleted", handler);
+      socket.off("device_status_change", handler);
+      socket.off("device_heartbeat", handler);
+    };
+  }, [socket, fetchDevices]);
+
+  const deleteDevice = async (device) => {
+    const confirmMsg =
+      `Delete device "${device.device_name}" (ID ${device.device_id})?\n\n` +
+      `This removes ALL its metrics, events, and sessions. Cannot be undone.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await api.delete(`/api/devices/${device.device_id}`);
+      fetchDevices();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete device");
+    }
+  };
+
   const filtered =
     filter === "ALL" ? devices : devices.filter((d) => d.status === filter);
+
   return (
     <Layout>
       <div className="flex justify-between items-center mb-6">
@@ -41,6 +78,7 @@ export default function Devices() {
           ))}
         </div>
       </div>
+
       <div className="bg-white rounded-lg shadow">
         {loading ? (
           <div className="p-6 text-center text-gray-500">Loading...</div>
@@ -78,13 +116,21 @@ export default function Devices() {
                       ? new Date(d.last_active_time).toLocaleString()
                       : "-"}
                   </td>
-                  <td className="px-6 py-3">
+                  <td className="px-6 py-3 whitespace-nowrap">
                     <Link
                       to={`/devices/${d.device_id}`}
-                      className="text-sm text-blue-600 hover:underline"
+                      className="text-sm text-blue-600 hover:underline mr-3"
                     >
-                      View →
+                      View
                     </Link>
+                    {isAdmin && (
+                      <button
+                        onClick={() => deleteDevice(d)}
+                        className="text-sm text-red-600 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -95,6 +141,7 @@ export default function Devices() {
     </Layout>
   );
 }
+
 function StatusBadge({ status }) {
   const styles = {
     ONLINE: "bg-green-100 text-green-800",

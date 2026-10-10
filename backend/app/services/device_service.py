@@ -68,3 +68,25 @@ def mark_stale_devices_offline(timeout_seconds: int) -> int:
         except Exception as exc:
             print(f"[socketio] Offline broadcast failed: {exc}")
     return count
+
+def delete_device(device_id: int) -> bool:
+    """Delete a device and all its related data (metrics, events, sessions).
+
+    Returns True if the device existed and was deleted, False otherwise.
+    """
+    from app.models.metric import NetworkMetric
+    from app.models.session import Session
+
+    device = db.session.get(Device, device_id)
+    if device is None:
+        return False
+
+    # Delete child rows first (foreign key order)
+    NetworkMetric.query.filter_by(device_id=device_id).delete()
+    Event.query.filter_by(device_id=device_id).delete()
+    Session.query.filter_by(device_id=device_id).delete()
+
+    # Delete the device itself
+    db.session.delete(device)
+    db.session.commit()
+    return True
