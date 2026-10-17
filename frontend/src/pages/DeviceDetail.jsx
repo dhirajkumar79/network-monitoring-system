@@ -137,6 +137,14 @@ export default function DeviceDetail() {
               {startingSession ? "Starting..." : "Start Remote Session"}
             </button>
           )}
+          {isAdmin && (
+            <button
+              onClick={deleteThisDevice}
+              className="bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-2 rounded"
+            >
+              Delete Device
+            </button>
+          )}
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
