@@ -7,5 +7,4 @@ db = SQLAlchemy()
 migrate = Migrate()
 jwt = JWTManager()
 
-# async_mode="threading" works without extra dependencies (no eventlet/gevent needed)
-socketio = SocketIO(cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(cors_allowed_origins="*", async_mode="eventlet")
